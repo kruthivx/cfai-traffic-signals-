@@ -53,8 +53,8 @@ def run_simulation(steps=3):
 
     print("\n")
     print("╔════════════════════════════════════════════════════╗")
-    print("║     INTELLIGENT TRAFFIC SIGNAL AI SYSTEM          ║")
-    print("║              CO1 → CO6 IMPLEMENTATION            ║")
+    print("║     INTELLIGENT TRAFFIC SIGNAL AI SYSTEM           ║")
+    print("║        AI-DRIVEN TRAFFIC OPTIMIZATION SYSTEM       ║")
     print("╚════════════════════════════════════════════════════╝")
 
     env = TrafficEnvironment()
@@ -78,7 +78,7 @@ def run_simulation(steps=3):
 
         print("\n")
         print("=" * 60)
-        print("CO1 : STATE SPACE REPRESENTATION")
+        print("TRAFFIC ANALYSIS")
         print("=" * 60)
 
         state_space = StateSpace(state)
@@ -91,7 +91,7 @@ def run_simulation(steps=3):
 
         trace.display()
 
-        logger.info("CO1 Completed")
+        logger.info("Traffic Analysis Completed")
 
         # ==================================================
         # CO2
@@ -99,7 +99,7 @@ def run_simulation(steps=3):
 
         print("\n")
         print("=" * 60)
-        print("CO2 : SEARCH ALGORITHMS")
+        print("ROUTE PLANNING ANALYSIS")
         print("=" * 60)
 
         network = RoadNetwork()
@@ -149,7 +149,7 @@ def run_simulation(steps=3):
         print("Path:", " -> ".join(astar_path))
         print("Cost:", astar_cost)
 
-        logger.info("CO2 Completed")
+        logger.info("Route Planning Completed")
 
         # ==================================================
         # CO3
@@ -157,7 +157,7 @@ def run_simulation(steps=3):
 
         print("\n")
         print("=" * 60)
-        print("CO3 : CSP SIGNAL SCHEDULING")
+        print("SIGNAL TIMING OPTIMIZATION")
         print("=" * 60)
 
         csp = TrafficCSP(state)
@@ -178,7 +178,7 @@ def run_simulation(steps=3):
             f"{csp_lane.upper()}"
         )
 
-        logger.info("CO3 Completed")
+        logger.info("Signal Optimization Completed")
 
         # ==================================================
         # CO4
@@ -186,7 +186,7 @@ def run_simulation(steps=3):
 
         print("\n")
         print("=" * 60)
-        print("CO4 : INTELLIGENT AGENTS")
+        print("DECISION ENGINE")
         print("=" * 60)
 
         utility_agent = UtilityAgent(state)
@@ -244,7 +244,7 @@ def run_simulation(steps=3):
             f"Pruned Nodes  : {pruned}"
         )
 
-        logger.info("CO4 Completed")
+        logger.info("Decision Engine Completed")
 
         # ==================================================
         # CO5
@@ -252,7 +252,7 @@ def run_simulation(steps=3):
 
         print("\n")
         print("=" * 60)
-        print("CO5 : BAYESIAN REASONING")
+        print("TRAFFIC PREDICTION")
         print("=" * 60)
 
         inference = TrafficInference()
@@ -273,7 +273,7 @@ def run_simulation(steps=3):
             f"{result['probability']:.2f}"
         )
 
-        logger.info("CO5 Completed")
+        logger.info("Traffic Prediction Completed")
 
         # ==================================================
         # CO6
@@ -281,7 +281,7 @@ def run_simulation(steps=3):
 
         print("\n")
         print("=" * 60)
-        print("CO6 : INTEGRATED REASONING")
+        print("FINAL DECISION SYSTEM")
         print("=" * 60)
 
         ai = IntegratedReasoner(state)

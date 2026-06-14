@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rule-Based Traffic Signal Optimization</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0a0e1a;
+  --bg2: #111827;
+  --bg3: #1a2235;
+  --surface: #1e2d45;
+  --border: rgba(99,179,255,0.15);
+  --border2: rgba(99,179,255,0.3);
+  --text: #e8f0fe;
+  --muted: #8ba3c7;
+  --accent: #3b82f6;
+  --accent2: #60a5fa;
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --purple: #a855f7;
+  --teal: #14b8a6;
+  --glass: rgba(30,45,69,0.7);
+  --glass2: rgba(59,130,246,0.08);
+  --r: 12px;
+  --r2: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+/* ─── TYPOGRAPHY ─── */
+h1 { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+h2 { font-size: 1.4rem; font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { color: var(--muted); }
+/* ─── LAYOUT ─── */
+.container { max-width: 1280px; margin: 0 auto; padding: 0 1.5rem; }
+section { padding: 4rem 0; }
+/* ─── HEADER ─── */
+header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,14,26,0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1.5rem;
+}
+nav { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+.logo { font-weight: 700; font-size: 0.9rem; color: var(--accent2); letter-spacing: 0.05em; text-transform: uppercase; }
+.nav-links { display: flex; gap: 1.5rem; }
+.nav-links a { color: var(--muted); text-decoration: none; font-size: 0.8rem; transition: color 0.2s; }
+.nav-links a:hover { color: var(--text); }
+/* ─── SIGNAL LIGHT ─── */
+.signal-anim { display: inline-flex; flex-direction: column; gap: 6px; background: #1a1a2e; border-radius: 10px; padding: 10px; border: 2px solid #333; }
+.signal-dot { width: 18px; height: 18px; border-radius: 50%; opacity: 0.2; transition: opacity 0.4s, box-shadow 0.4s; }
+.signal-dot.active { opacity: 1; }
+.s-red { background: #ef4444; }
+.s-yellow { background: #f59e0b; }
+.s-green { background: #22c55e; }
+.s-red.active { box-shadow: 0 0 12px #ef4444; }
+.s-yellow.active { box-shadow: 0 0 12px #f59e0b; }
+.s-green.active { box-shadow: 0 0 12px #22c55e; }
+/* ─── HERO ─── */
+#hero {
+  min-height: 90vh;
+  display: flex; align-items: center;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59,130,246,0.12) 0%, transparent 70%);
+  padding: 6rem 0 4rem;
+}
+.hero-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
+.hero-tag { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent2); background: var(--glass2); border: 1px solid var(--border); padding: 4px 12px; border-radius: 100px; display: inline-block; margin-bottom: 1.5rem; }
+.hero-title em { color: var(--accent2); font-style: normal; }
+.hero-sub { font-size: 1rem; color: var(--muted); margin: 1.5rem 0; max-width: 480px; line-height: 1.7; }
+.hero-signals { display: flex; gap: 1.5rem; align-items: center; justify-content: center; }
+.signal-column { display: flex; flex-direction: column; gap: 8px; }
+.signal-label { font-size: 0.65rem; text-align: center; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.hero-vis { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+/* ─── PROBLEM CARDS ─── */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; }
+.glass-card {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.5rem;
+  transition: border-color 0.3s, transform 0.3s;
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+.glass-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(59,130,246,0.05) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.glass-card:hover { border-color: var(--border2); transform: translateY(-3px); }
+.glass-card:hover::before { opacity: 1; }
+.card-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+.card-title { font-weight: 600; margin-bottom: 0.5rem; color: var(--text); }
+.card-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+/* ─── INTERSECTION ─── */
+#sim-section { background: var(--bg2); }
+.intersection-wrapper {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: 1fr auto 1fr;
+  gap: 0;
+  width: 520px;
+  height: 520px;
+  margin: 0 auto 2rem;
+  position: relative;
+}
+.road {
+  background: #1a1a2e;
+  position: relative;
+  overflow: hidden;
+}
+.road-n { grid-column: 2; grid-row: 1; width: 120px; }
+.road-s { grid-column: 2; grid-row: 3; width: 120px; }
+.road-e { grid-row: 2; grid-column: 3; height: 120px; }
+.road-w { grid-row: 2; grid-column: 1; height: 120px; }
+.intersection-center {
+  grid-column: 2; grid-row: 2;
+  width: 120px; height: 120px;
+  background: #242438;
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.center-cross {
+  position: absolute; inset: 0;
+}
+.center-cross::before, .center-cross::after {
+  content: ''; position: absolute;
+}
+.center-cross::before {
+  left: 50%; top: 0; bottom: 0;
+  width: 2px; background: rgba(255,255,255,0.06);
+  transform: translateX(-50%);
+}
+.center-cross::after {
+  top: 50%; left: 0; right: 0;
+  height: 2px; background: rgba(255,255,255,0.06);
+  transform: translateY(-50%);
+}
+.corner-bl { background: #0a0e1a; }
+.corner-br { background: #0a0e1a; }
+.corner-tl { background: #0a0e1a; }
+.corner-tr { background: #0a0e1a; }
+.road-label {
+  position: absolute;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: rgba(255,255,255,0.35);
+}
+.road-n .road-label { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.road-s .road-label { top: 8px; left: 50%; transform: translateX(-50%); }
+.road-e .road-label { left: 10px; top: 50%; transform: translateY(-50%); }
+.road-w .road-label { right: 10px; top: 50%; transform: translateY(-50%); }
+.road-marking {
+  position: absolute;
+  background: rgba(255,255,255,0.12);
+}
+.road-n .road-marking, .road-s .road-marking { width: 2px; top: 0; bottom: 0; left: 50%; }
+.road-e .road-marking, .road-w .road-marking { height: 2px; top: 50%; left: 0; right: 0; }
+/* Signal lights on roads */
+.road-signal {
+  position: absolute;
+  z-index: 5;
+}
+.road-n .road-signal { bottom: 4px; right: 6px; }
+.road-s .road-signal { top: 4px; right: 6px; }
+.road-e .road-signal { top: 6px; left: 4px; }
+.road-w .road-signal { top: 6px; right: 4px; }
+.mini-signal { display: flex; flex-direction: column; gap: 2px; background: #0a0a1a; border-radius: 4px; padding: 3px; border: 1px solid #333; }
+.mini-dot { width: 8px; height: 8px; border-radius: 50%; opacity: 0.15; transition: all 0.4s; }
+.mini-dot.active { opacity: 1; }
+.mini-red { background: #ef4444; }
+.mini-yellow { background: #f59e0b; }
+.mini-green { background: #22c55e; }
+.mini-red.active { box-shadow: 0 0 6px #ef4444; }
+.mini-yellow.active { box-shadow: 0 0 6px #f59e0b; }
+.mini-green.active { box-shadow: 0 0 6px #22c55e; }
+/* Cars */
+.car {
+  position: absolute;
+  border-radius: 3px;
+  transition: transform 0.08s linear;
+  z-index: 4;
+}
+/* Road stats panels */
+.road-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+.road-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 0.9rem 1rem;
+  display: flex; gap: 1rem; align-items: center;
+}
+.rsc-signal { flex-shrink: 0; }
+.rsc-name { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.rsc-metrics { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 4px; }
+.rsc-metric { font-size: 0.72rem; }
+.rsc-metric span { color: var(--accent2); font-weight: 600; }
+.rsc-status { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 100px; margin-top: 4px; display: inline-block; }
+.status-green { background: rgba(34,197,94,0.15); color: #22c55e; }
+.status-red { background: rgba(239,68,68,0.15); color: #ef4444; }
+.status-yellow { background: rgba(245,158,11,0.15); color: #f59e0b; }
+/* ─── DASHBOARD ─── */
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.dash-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem;
+  text-align: center;
+}
+.dash-card.highlight { border-color: var(--accent); background: rgba(59,130,246,0.08); }
+.dash-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.5rem; }
+.dash-value { font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.dash-value.green { color: var(--green); }
+.dash-value.accent { color: var(--accent2); }
+.dash-sub { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+.timer-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 0.75rem; overflow: hidden; }
+.timer-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 1s linear; }
+/* ─── TABLE ─── */
+.priority-table { width: 100%; border-collapse: collapse; }
+.priority-table th {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); padding: 0.6rem 1rem; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.priority-table td { padding: 0.7rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 0.85rem; }
+.priority-table tr.top-row td { background: rgba(59,130,246,0.08); }
+.priority-table tr.top-row td:first-child { border-left: 3px solid var(--accent); }
+.priority-badge { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.priority-badge.high { color: var(--accent2); }
+/* ─── EMERGENCY ─── */
+.emergency-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 1rem; }
+.em-btn {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #ef4444;
+  border-radius: var(--r);
+  padding: 1rem;
+  font-size: 0.9rem; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.em-btn:hover { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.6); transform: scale(1.02); }
+.em-btn:active { transform: scale(0.98); }
+.emergency-alert {
+  display: none;
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: var(--r2);
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: #ef4444;
+  animation: fadeIn 0.3s ease;
+}
+.emergency-alert.show { display: flex; align-items: center; gap: 8px; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+/* ─── CONTROLS ─── */
+.controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; }
+.control-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem;
+}
+.control-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 1rem; }
+.ctrl-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
+.ctrl-label { font-size: 0.82rem; color: var(--text); }
+.ctrl-val { font-size: 0.82rem; color: var(--accent2); font-weight: 600; min-width: 40px; text-align: right; }
+input[type=range] {
+  -webkit-appearance: none;
+  height: 4px;
+  background: var(--border2);
+  border-radius: 2px;
+  outline: none;
+  flex: 1;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent2);
+  cursor: pointer;
+}
+.toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 0.75rem; }
+.toggle-switch {
+  position: relative;
+  width: 36px; height: 20px;
+  background: var(--border2);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.toggle-switch.on { background: var(--accent); }
+.toggle-knob {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.3s;
+}
+.toggle-switch.on .toggle-knob { left: 18px; }
+.manual-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
+.manual-btn {
+  background: var(--glass2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--r2);
+  padding: 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.manual-btn:hover { background: rgba(59,130,246,0.15); border-color: var(--accent); color: var(--accent2); }
+/* ─── STATS ─── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem;
+  text-align: center;
+}
+.stat-num { font-size: 2rem; font-weight: 700; color: var(--accent2); margin-bottom: 0.25rem; }
+.stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+/* ─── EVENT LOG ─── */
+.log-container {
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  height: 250px;
+  overflow-y: auto;
+  padding: 0.75rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+}
+.log-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.log-time { color: var(--muted); margin-right: 6px; }
+.log-emergency { color: #ef4444; }
+.log-signal { color: #22c55e; }
+.log-warning { color: #f59e0b; }
+.log-info { color: var(--accent2); }
+/* ─── CHARTS ─── */
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem;
+}
+.chart-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 1rem; }
+/* ─── ALGORITHM ─── */
+.algo-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+.algo-step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 0.75rem 1.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 260px;
+  transition: all 0.4s;
+  position: relative;
+  z-index: 1;
+}
+.algo-step.active-step {
+  border-color: var(--accent);
+  background: rgba(59,130,246,0.12);
+  color: var(--accent2);
+  box-shadow: 0 0 20px rgba(59,130,246,0.2);
+}
+.algo-arrow { font-size: 1.2rem; color: var(--border2); margin: 6px 0; }
+/* ─── DECISION PANEL ─── */
+.decision-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+.decision-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.1rem;
+}
+.dc-road { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.6rem; }
+.dc-line { font-size: 0.78rem; color: var(--text); margin-bottom: 2px; }
+.dc-line .op { color: var(--muted); }
+.dc-line .eq { color: var(--accent2); font-weight: 600; }
+.dc-divider { border: none; border-top: 1px solid var(--border); margin: 0.6rem 0; }
+.dc-total { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.dc-total span { color: var(--accent2); }
+/* ─── SECTION HEADERS ─── */
+.section-header { margin-bottom: 2.5rem; }
+.section-eyebrow { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent2); margin-bottom: 0.5rem; }
+.section-title { font-size: 1.6rem; font-weight: 700; color: var(--text); }
+.section-sub { color: var(--muted); margin-top: 0.5rem; font-size: 0.9rem; }
+/* ─── TABLE WRAPPER ─── */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+/* ─── PULSE ANIMATION ─── */
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.pulse { animation: pulse 2s ease-in-out infinite; }
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .hero-inner { grid-template-columns: 1fr; }
+  .intersection-wrapper { width: 360px; height: 360px; }
+  .road-n, .road-s { width: 80px; }
+  .road-e, .road-w { height: 80px; }
+  .intersection-center { width: 80px; height: 80px; }
+  .hero-signals { flex-wrap: wrap; }
+}
+/* Section alternating bg */
+section:nth-child(even) { background: var(--bg2); }
+section:nth-child(odd) { background: var(--bg); }
+#hero { background: var(--bg) !important; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <nav>
+    <div class="logo">🚦 Traffic Signal OS</div>
+    <div class="nav-links">
+      <a href="#simulation">Simulation</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#emergency">Emergency</a>
+      <a href="#analytics">Analytics</a>
+      <a href="#algorithm">Algorithm</a>
+    </div>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="container">
+    <div class="hero-inner">
+      <div>
+        <div class="hero-tag">Rule-Based AI System</div>
+        <h1>Rule-Based<br><em>Traffic Signal</em><br>Optimization</h1>
+        <p class="hero-sub">An intelligent intersection control system using predefined rule logic to minimize congestion, reduce waiting times, and handle emergencies in real-time.</p>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.5rem;">
+          <a href="#simulation" style="background:var(--accent);color:#fff;text-decoration:none;padding:0.65rem 1.25rem;border-radius:var(--r);font-size:0.85rem;font-weight:600;transition:background 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='var(--accent)'">View Simulation →</a>
+          <a href="#algorithm" style="background:transparent;color:var(--accent2);text-decoration:none;padding:0.65rem 1.25rem;border-radius:var(--r);font-size:0.85rem;font-weight:600;border:1px solid var(--border2);">See Algorithm</a>
+        </div>
+      </div>
+      <div class="hero-vis">
+        <div class="hero-signals">
+          <div class="signal-column">
+            <div class="signal-label">North</div>
+            <div class="signal-anim" id="hero-n">
+              <div class="signal-dot s-red active"></div>
+              <div class="signal-dot s-yellow"></div>
+              <div class="signal-dot s-green"></div>
+            </div>
+          </div>
+          <div class="signal-column">
+            <div class="signal-label">South</div>
+            <div class="signal-anim" id="hero-s">
+              <div class="signal-dot s-red active"></div>
+              <div class="signal-dot s-yellow"></div>
+              <div class="signal-dot s-green"></div>
+            </div>
+          </div>
+          <div class="signal-column">
+            <div class="signal-label">East</div>
+            <div class="signal-anim" id="hero-e">
+              <div class="signal-dot s-red"></div>
+              <div class="signal-dot s-yellow"></div>
+              <div class="signal-dot s-green active"></div>
+            </div>
+          </div>
+          <div class="signal-column">
+            <div class="signal-label">West</div>
+            <div class="signal-anim" id="hero-w">
+              <div class="signal-dot s-red"></div>
+              <div class="signal-dot s-yellow"></div>
+              <div class="signal-dot s-green active"></div>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--muted);text-align:center;margin-top:0.5rem;">Live signal preview</div>
+        <div style="margin-top:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.5rem;text-align:center;min-width:240px;">
+          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:0.4rem;">Active Decision Rule</div>
+          <div id="hero-rule" style="font-size:0.85rem;color:var(--accent2);font-weight:600;">Highest Density Priority</div>
+          <div style="height:2px;background:var(--border);border-radius:1px;margin-top:0.75rem;">
+            <div id="hero-timer-fill" style="height:100%;background:var(--green);border-radius:1px;transition:width 0.5s;width:70%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM CARDS -->
+<section id="problem">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">Why This System</div>
+      <h2 class="section-title">Problems We Solve</h2>
+    </div>
+    <div class="card-grid">
+      <div class="glass-card">
+        <div class="card-icon">🚦</div>
+        <div class="card-title">Reduce Congestion</div>
+        <p class="card-desc">Dynamically allocate green time to roads with the highest vehicle density using real-time traffic data.</p>
+      </div>
+      <div class="glass-card">
+        <div class="card-icon">⏱</div>
+        <div class="card-title">Minimize Waiting</div>
+        <p class="card-desc">Roads with excessive waiting time gain priority boosts, ensuring no vehicle waits indefinitely.</p>
+      </div>
+      <div class="glass-card">
+        <div class="card-icon">⚖</div>
+        <div class="card-title">Fair Distribution</div>
+        <p class="card-desc">Fairness rules guarantee no road is starved of green time regardless of traffic patterns.</p>
+      </div>
+      <div class="glass-card">
+        <div class="card-icon">🧠</div>
+        <div class="card-title">Intelligent Decisions</div>
+        <p class="card-desc">Transparent rule-based decisions with full explainability — no black-box machine learning involved.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SIMULATION -->
+<section id="simulation">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">Live Simulation</div>
+      <h2 class="section-title">4-Road Intersection</h2>
+      <p class="section-sub">Vehicles spawn randomly and respond to traffic signals in real time.</p>
+    </div>
+
+    <!-- Intersection Canvas -->
+    <div style="display:flex;justify-content:center;">
+      <div class="intersection-wrapper">
+        <!-- Top-left corner -->
+        <div class="corner-tl" style="grid-column:1;grid-row:1;"></div>
+        <!-- North road -->
+        <div class="road road-n" id="road-north">
+          <div class="road-marking"></div>
+          <div class="road-label">North</div>
+          <div class="road-signal">
+            <div class="mini-signal">
+              <div class="mini-dot mini-red active" id="ns-r"></div>
+              <div class="mini-dot mini-yellow" id="ns-y"></div>
+              <div class="mini-dot mini-green" id="ns-g"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Top-right corner -->
+        <div class="corner-tr" style="grid-column:3;grid-row:1;"></div>
+        <!-- West road -->
+        <div class="road road-w" id="road-west">
+          <div class="road-marking"></div>
+          <div class="road-label">West</div>
+          <div class="road-signal">
+            <div class="mini-signal">
+              <div class="mini-dot mini-red" id="ws-r"></div>
+              <div class="mini-dot mini-yellow" id="ws-y"></div>
+              <div class="mini-dot mini-green active" id="ws-g"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Center -->
+        <div class="intersection-center">
+          <div class="center-cross"></div>
+          <div id="center-label" style="font-size:0.6rem;color:rgba(255,255,255,0.3);text-align:center;z-index:1;position:relative;">
+            <div style="font-weight:700;color:var(--accent2);font-size:0.7rem;" id="center-green-road">WEST</div>
+            <div>GREEN</div>
+          </div>
+        </div>
+        <!-- East road -->
+        <div class="road road-e" id="road-east">
+          <div class="road-marking"></div>
+          <div class="road-label">East</div>
+          <div class="road-signal">
+            <div class="mini-signal">
+              <div class="mini-dot mini-red" id="es-r"></div>
+              <div class="mini-dot mini-yellow" id="es-y"></div>
+              <div class="mini-dot mini-green active" id="es-g"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Bottom-left corner -->
+        <div class="corner-bl" style="grid-column:1;grid-row:3;"></div>
+        <!-- South road -->
+        <div class="road road-s" id="road-south">
+          <div class="road-marking"></div>
+          <div class="road-label">South</div>
+          <div class="road-signal">
+            <div class="mini-signal">
+              <div class="mini-dot mini-red active" id="ss-r"></div>
+              <div class="mini-dot mini-yellow" id="ss-y"></div>
+              <div class="mini-dot mini-green" id="ss-g"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Bottom-right corner -->
+        <div class="corner-br" style="grid-column:3;grid-row:3;"></div>
+      </div>
+    </div>
+
+    <!-- Road Stats -->
+    <div class="road-stats-grid">
+      <div class="road-stat-card" id="stat-north">
+        <div class="rsc-signal">
+          <div class="mini-signal" style="transform:scale(1.2)">
+            <div class="mini-dot mini-red active" id="stat-ns-r"></div>
+            <div class="mini-dot mini-yellow" id="stat-ns-y"></div>
+            <div class="mini-dot mini-green" id="stat-ns-g"></div>
+          </div>
+        </div>
+        <div>
+          <div class="rsc-name">North</div>
+          <div class="rsc-metrics">
+            <div class="rsc-metric">Vehicles: <span id="n-vehicles">0</span></div>
+            <div class="rsc-metric">Queue: <span id="n-queue">0</span></div>
+            <div class="rsc-metric">Wait: <span id="n-wait">0</span>s</div>
+            <div class="rsc-metric">Density: <span id="n-density">0</span>%</div>
+          </div>
+          <div class="rsc-status status-red" id="n-status">RED</div>
+        </div>
+      </div>
+      <div class="road-stat-card" id="stat-south">
+        <div class="rsc-signal">
+          <div class="mini-signal" style="transform:scale(1.2)">
+            <div class="mini-dot mini-red active" id="stat-ss-r"></div>
+            <div class="mini-dot mini-yellow" id="stat-ss-y"></div>
+            <div class="mini-dot mini-green" id="stat-ss-g"></div>
+          </div>
+        </div>
+        <div>
+          <div class="rsc-name">South</div>
+          <div class="rsc-metrics">
+            <div class="rsc-metric">Vehicles: <span id="s-vehicles">0</span></div>
+            <div class="rsc-metric">Queue: <span id="s-queue">0</span></div>
+            <div class="rsc-metric">Wait: <span id="s-wait">0</span>s</div>
+            <div class="rsc-metric">Density: <span id="s-density">0</span>%</div>
+          </div>
+          <div class="rsc-status status-red" id="s-status">RED</div>
+        </div>
+      </div>
+      <div class="road-stat-card" id="stat-east">
+        <div class="rsc-signal">
+          <div class="mini-signal" style="transform:scale(1.2)">
+            <div class="mini-dot mini-red" id="stat-es-r"></div>
+            <div class="mini-dot mini-yellow" id="stat-es-y"></div>
+            <div class="mini-dot mini-green active" id="stat-es-g"></div>
+          </div>
+        </div>
+        <div>
+          <div class="rsc-name">East</div>
+          <div class="rsc-metrics">
+            <div class="rsc-metric">Vehicles: <span id="e-vehicles">0</span></div>
+            <div class="rsc-metric">Queue: <span id="e-queue">0</span></div>
+            <div class="rsc-metric">Wait: <span id="e-wait">0</span>s</div>
+            <div class="rsc-metric">Density: <span id="e-density">0</span>%</div>
+          </div>
+          <div class="rsc-status status-green" id="e-status">GREEN</div>
+        </div>
+      </div>
+      <div class="road-stat-card" id="stat-west">
+        <div class="rsc-signal">
+          <div class="mini-signal" style="transform:scale(1.2)">
+            <div class="mini-dot mini-red" id="stat-ws-r"></div>
+            <div class="mini-dot mini-yellow" id="stat-ws-y"></div>
+            <div class="mini-dot mini-green active" id="stat-ws-g"></div>
+          </div>
+        </div>
+        <div>
+          <div class="rsc-name">West</div>
+          <div class="rsc-metrics">
+            <div class="rsc-metric">Vehicles: <span id="w-vehicles">0</span></div>
+            <div class="rsc-metric">Queue: <span id="w-queue">0</span></div>
+            <div class="rsc-metric">Wait: <span id="w-wait">0</span>s</div>
+            <div class="rsc-metric">Density: <span id="w-density">0</span>%</div>
+          </div>
+          <div class="rsc-status status-green" id="w-status">GREEN</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section id="dashboard">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">Real-Time Analytics</div>
+      <h2 class="section-title">System Dashboard</h2>
+    </div>
+    <div class="dashboard-grid">
+      <div class="dash-card highlight">
+        <div class="dash-label">Current Green Signal</div>
+        <div class="dash-value accent" id="db-green">EAST / WEST</div>
+        <div class="dash-sub">Active direction</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-label">Decision Rule</div>
+        <div class="dash-value" style="font-size:0.95rem;" id="db-rule">Highest Density</div>
+        <div class="dash-sub" id="db-rule-detail">Primary trigger</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-label">System Status</div>
+        <div class="dash-value green" id="db-status">Optimal</div>
+        <div class="dash-sub">Traffic flow</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-label">Signal Timer</div>
+        <div class="dash-value accent" id="db-timer">15s</div>
+        <div class="timer-bar"><div class="timer-fill" id="db-timer-fill" style="width:100%"></div></div>
+      </div>
+    </div>
+
+    <!-- Priority Table -->
+    <div class="table-wrap">
+      <table class="priority-table">
+        <thead>
+          <tr>
+            <th>Road</th>
+            <th>Vehicles</th>
+            <th>Waiting (s)</th>
+            <th>Queue</th>
+            <th>Priority Score</th>
+            <th>Rule Triggered</th>
+          </tr>
+        </thead>
+        <tbody id="priority-tbody">
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- EMERGENCY -->
+<section id="emergency">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">Override Protocol</div>
+      <h2 class="section-title">Emergency Override</h2>
+      <p class="section-sub">When an emergency vehicle is detected, all signals immediately yield. Override takes highest priority.</p>
+    </div>
+    <div class="emergency-grid">
+      <button class="em-btn" onclick="triggerEmergency('North')">🚨 Emergency North</button>
+      <button class="em-btn" onclick="triggerEmergency('South')">🚨 Emergency South</button>
+      <button class="em-btn" onclick="triggerEmergency('East')">🚨 Emergency East</button>
+      <button class="em-btn" onclick="triggerEmergency('West')">🚨 Emergency West</button>
+    </div>
+    <div class="emergency-alert" id="em-alert">
+      <span>🚨</span>
+      <span id="em-alert-text">Emergency vehicle detected on North — all signals yielding!</span>
+    </div>
+  </div>
+</section>
+
+<!-- CONTROLS -->
+<section id="controls">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">System Controls</div>
+      <h2 class="section-title">Traffic Control Panel</h2>
+    </div>
+    <div class="controls-grid">
+      <div class="control-card">
+        <div class="control-title">Simulation Speed</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">Speed</span>
+          <input type="range" id="speed-slider" min="0.5" max="3" step="0.5" value="1">
+          <span class="ctrl-val" id="speed-val">1×</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--muted);margin-top:-4px;">
+          <span>Slow</span><span>Normal</span><span>Fast</span>
+        </div>
+      </div>
+      <div class="control-card">
+        <div class="control-title">Vehicle Spawn Rate</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">Rate</span>
+          <input type="range" id="spawn-slider" min="0" max="100" step="5" value="50">
+          <span class="ctrl-val" id="spawn-val">50</span>
+        </div>
+      </div>
+      <div class="control-card">
+        <div class="control-title">Auto Mode</div>
+        <div class="toggle-row">
+          <div class="toggle-switch on" id="auto-toggle" onclick="toggleAuto()">
+            <div class="toggle-knob"></div>
+          </div>
+          <span class="ctrl-label" id="auto-label">Auto Mode ON</span>
+        </div>
+        <p style="font-size:0.75rem;color:var(--muted);line-height:1.5;">Rule engine automatically selects optimal green signal. Disable for manual control.</p>
+      </div>
+      <div class="control-card">
+        <div class="control-title">Manual Override</div>
+        <div class="manual-btns">
+          <button class="manual-btn" onclick="manualGreen('North')">Green North</button>
+          <button class="manual-btn" onclick="manualGreen('South')">Green South</button>
+          <button class="manual-btn" onclick="manualGreen('East')">Green East</button>
+          <button class="manual-btn" onclick="manualGreen('West')">Green West</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section id="stats">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">Performance Metrics</div>
+      <h2 class="section-title">Live Statistics</h2>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-label">Total Vehicles Processed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-avgwait">0s</div>
+        <div class="stat-label">Avg Waiting Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-congestion">Low</div>
+        <div class="stat-label">Congestion Index</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-emergency">0</div>
+        <div class="stat-label">Emergency Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-changes">0</div>
+        <div class="stat-label">Signal Changes</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EVENT LOG -->
+<section id="log">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">System Log</div>
+      <h2 class="section-title">Event Log</h2>
+    </div>
+    <div class="log-container" id="event-log">
+      <div class="log-entry"><span class="log-time">[--:--:--]</span><span class="log-info">System initialized. Auto mode active.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- CHARTS -->
+<section id="analytics">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">Visualization</div>
+      <h2 class="section-title">Traffic Analytics</h2>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Vehicle Density by Road</div>
+        <div style="position:relative;height:220px;">
+          <canvas id="density-chart" role="img" aria-label="Bar chart showing vehicle density for North, South, East, West roads"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Waiting Time Trend (seconds)</div>
+        <div style="position:relative;height:220px;">
+          <canvas id="wait-chart" role="img" aria-label="Line chart showing waiting time trend over last 20 cycles"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Priority Score Comparison</div>
+        <div style="position:relative;height:220px;">
+          <canvas id="radar-chart" role="img" aria-label="Radar chart comparing priority scores across all four roads"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ALGORITHM -->
+<section id="algorithm">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">Engine Internals</div>
+      <h2 class="section-title">Algorithm Flow</h2>
+      <p class="section-sub">The rule engine executes this pipeline every cycle.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:start;">
+      <div>
+        <div class="algo-flow" id="algo-flow">
+          <div class="algo-step" id="step-0">1. Collect Traffic Data</div>
+          <div class="algo-arrow">↓</div>
+          <div class="algo-step" id="step-1">2. Calculate Priority Scores</div>
+          <div class="algo-arrow">↓</div>
+          <div class="algo-step" id="step-2">3. Apply Fairness Rules</div>
+          <div class="algo-arrow">↓</div>
+          <div class="algo-step" id="step-3">4. Check Emergency Override</div>
+          <div class="algo-arrow">↓</div>
+          <div class="algo-step" id="step-4">5. Select Highest Priority Road</div>
+          <div class="algo-arrow">↓</div>
+          <div class="algo-step" id="step-5">6. Assign Green Signal</div>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:1.25rem;color:var(--text);">Decision Rules</h3>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+          <div class="glass-card" style="padding:1rem;">
+            <div style="font-size:0.7rem;color:var(--accent2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Rule 1 — Density</div>
+            <div style="font-size:0.82rem;color:var(--text);font-family:monospace;">Priority += Vehicles × 2</div>
+          </div>
+          <div class="glass-card" style="padding:1rem;">
+            <div style="font-size:0.7rem;color:var(--amber);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Rule 2 — Waiting Time</div>
+            <div style="font-size:0.82rem;color:var(--text);font-family:monospace;">Priority += WaitingTime</div>
+          </div>
+          <div class="glass-card" style="padding:1rem;">
+            <div style="font-size:0.7rem;color:var(--teal);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Rule 3 — Queue Length</div>
+            <div style="font-size:0.82rem;color:var(--text);font-family:monospace;">Priority += Queue × 1.5</div>
+          </div>
+          <div class="glass-card" style="padding:1rem;">
+            <div style="font-size:0.7rem;color:var(--purple);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Rule 4 — Fairness</div>
+            <div style="font-size:0.82rem;color:var(--text);font-family:monospace;">Priority += FairnessBonus</div>
+          </div>
+          <div class="glass-card" style="padding:1rem;border-color:rgba(239,68,68,0.4);">
+            <div style="font-size:0.7rem;color:#ef4444;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Rule 5 — Emergency Override</div>
+            <div style="font-size:0.82rem;color:var(--text);font-family:monospace;">Emergency road → immediate green</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DECISION TRANSPARENCY -->
+<section id="transparency">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-eyebrow">Explainability</div>
+      <h2 class="section-title">Decision Transparency</h2>
+      <p class="section-sub">Exact priority calculations updated every second.</p>
+    </div>
+    <div class="decision-grid" id="decision-grid">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</section>
+
+<footer style="background:var(--bg2);border-top:1px solid var(--border);padding:2rem 0;text-align:center;">
+  <div class="container">
+    <p style="font-size:0.8rem;color:var(--muted);">Rule-Based Traffic Signal Optimization System · Real-time simulation · No machine learning</p>
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+const ROADS = ['North','South','East','West'];
+const COLORS = { North:'#60a5fa', South:'#34d399', East:'#f59e0b', West:'#a855f7' };
+const MAX_CAP = 20;
+
+let state = {
+  roads: {
+    North: { vehicles:5, queue:3, wait:8, density:25, lastGreen:0, sinceGreen:15 },
+    South: { vehicles:3, queue:2, wait:5, density:15, lastGreen:0, sinceGreen:12 },
+    East:  { vehicles:12, queue:7, wait:18, density:60, lastGreen:0, sinceGreen:0 },
+    West:  { vehicles:8, queue:5, wait:12, density:40, lastGreen:0, sinceGreen:0 },
+  },
+  greenRoad: 'East',
+  oppositeGreen: 'West',
+  greenTimer: 15,
+  greenDuration: 15,
+  tick: 0,
+  autoMode: true,
+  emergency: null,
+  emergencyTimer: 0,
+  stats: { total:0, totalWait:0, waitCount:0, emergencies:0, changes:0 },
+  simSpeed: 1,
+  spawnRate: 50,
+  waitHistory: Array(20).fill(0),
+  algoStep: 0,
+};
+
+// ═══════════════════════════════════════════════════════════
+//  CARS
+// ═══════════════════════════════════════════════════════════
+let cars = [];
+let carId = 0;
+
+function spawnCar(road) {
+  const el = document.createElement('div');
+  el.className = 'car';
+  const hues = { North:'#3b82f6', South:'#22c55e', East:'#f59e0b', West:'#a855f7' };
+  el.style.background = hues[road];
+  el.style.width = road === 'North' || road === 'South' ? '14px' : '20px';
+  el.style.height = road === 'North' || road === 'South' ? '22px' : '13px';
+
+  const roadEl = document.getElementById('road-' + road.toLowerCase());
+  if (!roadEl) return;
+
+  let x, y;
+  if (road === 'North') { x = 48; y = -25; }
+  else if (road === 'South') { x = 48; y = roadEl.offsetHeight + 5; }
+  else if (road === 'East') { x = roadEl.offsetWidth + 5; y = 48; }
+  else { x = -25; y = 48; }
+
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  roadEl.appendChild(el);
+
+  const car = { id: carId++, el, road, x, y, speed: 0.8 + Math.random()*0.4, stopped: false };
+  cars.push(car);
+}
+
+function moveCars() {
+  const toRemove = [];
+  cars.forEach(car => {
+    const roadEl = document.getElementById('road-' + car.road.toLowerCase());
+    if (!roadEl) return;
+    const W = roadEl.offsetWidth;
+    const H = roadEl.offsetHeight;
+    const isGreen = car.road === state.greenRoad || car.road === state.oppositeGreen;
+    const stopY = H - 35;
+    const stopX = -20;
+
+    let stopped = false;
+    if (!isGreen) {
+      if (car.road === 'North' && car.y >= stopY - 5) { stopped = true; }
+      if (car.road === 'South' && car.y <= 35) { stopped = true; }
+      if (car.road === 'East' && car.x <= 35) { stopped = true; }
+      if (car.road === 'West' && car.x >= W - 35) { stopped = true; }
+    }
+    car.stopped = stopped;
+    if (!stopped) {
+      const s = car.speed * state.simSpeed;
+      if (car.road === 'North') car.y += s;
+      else if (car.road === 'South') car.y -= s;
+      else if (car.road === 'East') car.x -= s;
+      else car.x += s;
+    }
+    car.el.style.left = Math.round(car.x) + 'px';
+    car.el.style.top = Math.round(car.y) + 'px';
+
+    // Remove if off screen
+    if (car.road === 'North' && car.y > H + 30) toRemove.push(car.id);
+    if (car.road === 'South' && car.y < -30) toRemove.push(car.id);
+    if (car.road === 'East' && car.x < -30) toRemove.push(car.id);
+    if (car.road === 'West' && car.x > W + 30) toRemove.push(car.id);
+  });
+  cars = cars.filter(c => {
+    if (toRemove.includes(c.id)) { c.el.remove(); return false; }
+    return true;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RULE ENGINE
+// ═══════════════════════════════════════════════════════════
+function calcPriority(road) {
+  const r = state.roads[road];
+  let p = 0;
+  let rules = [];
+
+  // Rule 1: Density
+  const densityScore = r.vehicles * 2;
+  p += densityScore;
+  if (r.vehicles > 0) rules.push('Density');
+
+  // Rule 2: Waiting time
+  if (r.wait > 10) {
+    p += r.wait;
+    rules.push('Wait Threshold');
+  }
+
+  // Rule 3: Queue
+  const queueScore = r.queue * 1.5;
+  p += queueScore;
+  if (r.queue > 0) rules.push('Queue Length');
+
+  // Rule 4: Fairness
+  const fairnessBonus = Math.max(0, r.sinceGreen * 2 - 20);
+  p += fairnessBonus;
+  if (fairnessBonus > 0) rules.push('Fairness Boost');
+
+  return { score: Math.round(p), rules, densityScore: Math.round(densityScore), queueScore: Math.round(queueScore), fairnessBonus: Math.round(fairnessBonus) };
+}
+
+function selectGreen() {
+  if (state.emergency) return state.emergency;
+  let best = null, bestScore = -1;
+  ROADS.forEach(road => {
+    const { score } = calcPriority(road);
+    if (score > bestScore) { bestScore = score; best = road; }
+  });
+  return best;
+}
+
+function getOpposite(road) {
+  const pairs = { North:'South', South:'North', East:'West', West:'East' };
+  return pairs[road];
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SIGNAL UPDATE
+// ═══════════════════════════════════════════════════════════
+function setSignal(road) {
+  const prev = state.greenRoad;
+  state.greenRoad = road;
+  state.oppositeGreen = getOpposite(road);
+  if (prev !== road) {
+    state.stats.changes++;
+    document.getElementById('stat-changes').textContent = state.stats.changes;
+    log(`${road} received green signal (opposite: ${state.oppositeGreen})`, 'signal');
+    state.roads[prev].sinceGreen++;
+    state.roads[road].sinceGreen = 0;
+    state.roads[state.oppositeGreen].sinceGreen = 0;
+    state.greenDuration = Math.max(10, Math.min(25, 10 + Math.floor(state.roads[road].vehicles)));
+    state.greenTimer = state.greenDuration;
+  }
+  updateSignalUI();
+}
+
+function updateSignalUI() {
+  ROADS.forEach(road => {
+    const key = road[0].toLowerCase() + 's';
+    const isGreen = road === state.greenRoad || road === state.oppositeGreen;
+    const prefixes = { North:'n', South:'s', East:'e', West:'w' };
+    const statPfx = road[0].toLowerCase();
+    // Intersection mini signals
+    document.getElementById(key + '-r').classList.toggle('active', !isGreen);
+    document.getElementById(key + '-y').classList.toggle('active', false);
+    document.getElementById(key + '-g').classList.toggle('active', isGreen);
+    // Stat panel signals
+    document.getElementById('stat-' + key + '-r').classList.toggle('active', !isGreen);
+    document.getElementById('stat-' + key + '-y').classList.toggle('active', false);
+    document.getElementById('stat-' + key + '-g').classList.toggle('active', isGreen);
+    // Hero signals
+    const heroEl = document.getElementById('hero-' + road[0].toLowerCase());
+    if (heroEl) {
+      heroEl.children[0].classList.toggle('active', !isGreen);
+      heroEl.children[1].classList.toggle('active', false);
+      heroEl.children[2].classList.toggle('active', isGreen);
+    }
+    // Status badges
+    const statusEl = document.getElementById(statPfx + '-status');
+    if (statusEl) {
+      statusEl.textContent = isGreen ? 'GREEN' : 'RED';
+      statusEl.className = 'rsc-status ' + (isGreen ? 'status-green' : 'status-red');
+    }
+  });
+  document.getElementById('center-green-road').textContent = state.greenRoad + ' / ' + state.oppositeGreen;
+  const greenText = state.greenRoad + ' / ' + state.oppositeGreen;
+  document.getElementById('db-green').textContent = greenText;
+  document.getElementById('hero-rule').textContent = calcPriority(state.greenRoad).rules.join(' + ') || 'Default';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TRAFFIC SIMULATION
+// ═══════════════════════════════════════════════════════════
+function updateTraffic() {
+  ROADS.forEach(road => {
+    const r = state.roads[road];
+    const isGreen = road === state.greenRoad || road === state.oppositeGreen;
+
+    // Spawn
+    if (Math.random() * 100 < state.spawnRate * 0.08) {
+      if (r.vehicles < MAX_CAP) {
+        r.vehicles = Math.min(MAX_CAP, r.vehicles + 1);
+        r.queue = Math.max(0, Math.min(r.vehicles, r.queue + 1));
+        // Spawn car visually
+        if (cars.filter(c=>c.road===road).length < 12) spawnCar(road);
+      }
+    }
+
+    // Process (green = vehicles leave faster)
+    if (isGreen && r.vehicles > 0) {
+      const leaving = Math.min(r.vehicles, Math.floor(Math.random() * 2) + 1);
+      r.vehicles = Math.max(0, r.vehicles - leaving);
+      r.queue = Math.max(0, r.queue - leaving);
+      state.stats.total += leaving;
+      document.getElementById('stat-total').textContent = state.stats.total;
+      r.wait = Math.max(0, r.wait - 2);
+    } else if (!isGreen) {
+      r.wait = Math.min(60, r.wait + (r.vehicles > 0 ? 1 : 0));
+      r.sinceGreen++;
+    }
+    r.density = Math.round((r.vehicles / MAX_CAP) * 100);
+  });
+
+  // Update stats
+  let totalWait = 0, count = 0;
+  ROADS.forEach(road => { if (state.roads[road].wait > 0) { totalWait += state.roads[road].wait; count++; } });
+  const avg = count > 0 ? Math.round(totalWait / count) : 0;
+  document.getElementById('stat-avgwait').textContent = avg + 's';
+
+  const totalVeh = ROADS.reduce((s,r)=>s+state.roads[r].vehicles,0);
+  const ci = totalVeh > 60 ? 'Critical' : totalVeh > 40 ? 'High' : totalVeh > 20 ? 'Medium' : 'Low';
+  document.getElementById('stat-congestion').textContent = ci;
+
+  const statusEl = document.getElementById('db-status');
+  statusEl.textContent = ci === 'Low' ? 'Optimal' : ci === 'Medium' ? 'Moderate' : 'Congested';
+  statusEl.className = 'dash-value ' + (ci==='Low'?'green':ci==='Medium'?'accent':'');
+
+  // Warning log
+  ROADS.forEach(road => {
+    if (state.roads[road].wait > 25 && state.tick % 15 === 0) {
+      log(`Waiting time threshold exceeded on ${road} (${state.roads[road].wait}s)`, 'warning');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UI UPDATES
+// ═══════════════════════════════════════════════════════════
+function updateRoadStats() {
+  ROADS.forEach(road => {
+    const r = state.roads[road];
+    const k = road[0].toLowerCase();
+    document.getElementById(k + '-vehicles').textContent = r.vehicles;
+    document.getElementById(k + '-queue').textContent = r.queue;
+    document.getElementById(k + '-wait').textContent = r.wait;
+    document.getElementById(k + '-density').textContent = r.density + '%';
+  });
+}
+
+function updatePriorityTable() {
+  const scores = ROADS.map(road => {
+    const p = calcPriority(road);
+    return { road, ...p, vehicles: state.roads[road].vehicles, wait: state.roads[road].wait, queue: state.roads[road].queue };
+  }).sort((a,b) => b.score - a.score);
+
+  const tbody = document.getElementById('priority-tbody');
+  tbody.innerHTML = scores.map((item, i) => `
+    <tr class="${i===0?'top-row':''}">
+      <td style="font-weight:600;color:${COLORS[item.road]}">${item.road}</td>
+      <td>${item.vehicles}</td>
+      <td>${item.wait}s</td>
+      <td>${item.queue}</td>
+      <td><span class="priority-badge ${i===0?'high':''}">${i===0?'★ ':''}${item.score}</span></td>
+      <td style="font-size:0.75rem;color:var(--muted)">${item.rules.join(', ') || '—'}</td>
+    </tr>
+  `).join('');
+
+  // Decision transparency
+  const grid = document.getElementById('decision-grid');
+  grid.innerHTML = scores.map(item => `
+    <div class="decision-card" style="border-color:${item.road===state.greenRoad?'var(--accent)':'var(--border)'}">
+      <div class="dc-road">${item.road} Road ${item.road===state.greenRoad?'🟢':item.road===state.oppositeGreen?'🟢':'🔴'}</div>
+      <div class="dc-line">Vehicles <span class="op">=</span> ${state.roads[item.road].vehicles} <span class="op">×</span> 2 <span class="op">=</span> <span class="eq">${item.densityScore}</span></div>
+      <div class="dc-line">Waiting <span class="op">=</span> ${state.roads[item.road].wait > 10 ? state.roads[item.road].wait : '0 (below threshold)'}</div>
+      <div class="dc-line">Queue <span class="op">=</span> ${state.roads[item.road].queue} <span class="op">×</span> 1.5 <span class="op">=</span> <span class="eq">${item.queueScore}</span></div>
+      <div class="dc-line">Fairness <span class="op">=</span> <span class="eq">${item.fairnessBonus}</span></div>
+      <hr class="dc-divider">
+      <div class="dc-total">Total Priority <span>= ${item.score}</span></div>
+    </div>
+  `).join('');
+
+  // Dashboard rule
+  const top = scores[0];
+  document.getElementById('db-rule').textContent = top.rules[0] || 'Balanced';
+  document.getElementById('db-rule-detail').textContent = top.rules.join(' + ') || 'No dominant rule';
+}
+
+function updateTimer() {
+  if (state.emergency) {
+    state.emergencyTimer--;
+    if (state.emergencyTimer <= 0) {
+      state.emergency = null;
+      document.getElementById('em-alert').classList.remove('show');
+      log('Emergency override cleared. Auto mode resumed.', 'info');
+    }
+  } else if (state.autoMode) {
+    state.greenTimer--;
+    const pct = Math.round((state.greenTimer / state.greenDuration) * 100);
+    document.getElementById('db-timer').textContent = state.greenTimer + 's';
+    document.getElementById('db-timer-fill').style.width = pct + '%';
+    document.getElementById('hero-timer-fill').style.width = pct + '%';
+    if (state.greenTimer <= 0) {
+      const next = selectGreen();
+      setSignal(next);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ALGO STEP ANIMATION
+// ═══════════════════════════════════════════════════════════
+function animateAlgoStep() {
+  for (let i = 0; i < 6; i++) {
+    document.getElementById('step-' + i).classList.remove('active-step');
+  }
+  document.getElementById('step-' + state.algoStep).classList.add('active-step');
+  state.algoStep = (state.algoStep + 1) % 6;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CHARTS
+// ═══════════════════════════════════════════════════════════
+let densityChart, waitChart, radarChart;
+
+function initCharts() {
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {}
+  };
+
+  densityChart = new Chart(document.getElementById('density-chart'), {
+    type: 'bar',
+    data: {
+      labels: ROADS,
+      datasets: [{
+        label: 'Vehicle Density %',
+        data: ROADS.map(r => state.roads[r].density),
+        backgroundColor: ROADS.map(r => COLORS[r] + '99'),
+        borderColor: ROADS.map(r => COLORS[r]),
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8ba3c7', callback: v => v + '%' } },
+        x: { grid: { display: false }, ticks: { color: '#8ba3c7' } }
+      }
+    }
+  });
+
+  waitChart = new Chart(document.getElementById('wait-chart'), {
+    type: 'line',
+    data: {
+      labels: Array.from({length:20}, (_,i) => i+1),
+      datasets: [{
+        label: 'Avg Wait',
+        data: state.waitHistory,
+        borderColor: '#60a5fa',
+        backgroundColor: 'rgba(96,165,250,0.08)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        y: { grid: { color:'rgba(255,255,255,0.05)' }, ticks: { color:'#8ba3c7', callback: v=>v+'s' } },
+        x: { grid: { display:false }, ticks: { display:false } }
+      }
+    }
+  });
+
+  radarChart = new Chart(document.getElementById('radar-chart'), {
+    type: 'radar',
+    data: {
+      labels: ROADS,
+      datasets: [{
+        label: 'Priority Score',
+        data: ROADS.map(r => calcPriority(r).score),
+        backgroundColor: 'rgba(59,130,246,0.15)',
+        borderColor: '#3b82f6',
+        pointBackgroundColor: ROADS.map(r => COLORS[r]),
+        borderWidth: 2,
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        r: {
+          grid: { color:'rgba(255,255,255,0.06)' },
+          angleLines: { color:'rgba(255,255,255,0.06)' },
+          ticks: { display: false },
+          pointLabels: { color:'#8ba3c7', font: { size: 12 } }
+        }
+      }
+    }
+  });
+}
+
+function updateCharts() {
+  if (!densityChart) return;
+  densityChart.data.datasets[0].data = ROADS.map(r => state.roads[r].density);
+  densityChart.update('none');
+
+  const avgWait = Math.round(ROADS.reduce((s,r)=>s+state.roads[r].wait,0)/4);
+  state.waitHistory.push(avgWait);
+  state.waitHistory.shift();
+  waitChart.data.datasets[0].data = [...state.waitHistory];
+  waitChart.update('none');
+
+  radarChart.data.datasets[0].data = ROADS.map(r => calcPriority(r).score);
+  radarChart.update('none');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LOGGING
+// ═══════════════════════════════════════════════════════════
+function log(msg, type='info') {
+  const el = document.getElementById('event-log');
+  const now = new Date();
+  const ts = now.toTimeString().slice(0,8);
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">[${ts}]</span><span class="log-${type}">${msg}</span>`;
+  el.insertBefore(div, el.firstChild);
+  while (el.children.length > 50) el.removeChild(el.lastChild);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════════════════
+function triggerEmergency(road) {
+  state.emergency = road;
+  state.emergencyTimer = 15;
+  state.stats.emergencies++;
+  document.getElementById('stat-emergency').textContent = state.stats.emergencies;
+  setSignal(road);
+  const alertEl = document.getElementById('em-alert');
+  document.getElementById('em-alert-text').textContent = `Emergency vehicle detected on ${road} — all signals yielding!`;
+  alertEl.classList.add('show');
+  log(`EMERGENCY detected on ${road}. All signals yielding immediately.`, 'emergency');
+  setTimeout(() => alertEl.classList.remove('show'), 8000);
+}
+
+function manualGreen(road) {
+  if (state.autoMode) {
+    state.autoMode = false;
+    document.getElementById('auto-toggle').classList.remove('on');
+    document.getElementById('auto-label').textContent = 'Auto Mode OFF';
+    log('Auto mode disabled. Manual override active.', 'warning');
+  }
+  setSignal(road);
+  log(`Manual override: ${road} set to green.`, 'info');
+}
+
+function toggleAuto() {
+  state.autoMode = !state.autoMode;
+  const tog = document.getElementById('auto-toggle');
+  tog.classList.toggle('on', state.autoMode);
+  document.getElementById('auto-label').textContent = 'Auto Mode ' + (state.autoMode ? 'ON' : 'OFF');
+  log('Auto mode ' + (state.autoMode ? 'enabled.' : 'disabled.'), 'info');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CONTROLS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('speed-slider').addEventListener('input', function() {
+  state.simSpeed = parseFloat(this.value);
+  document.getElementById('speed-val').textContent = this.value + '×';
+});
+document.getElementById('spawn-slider').addEventListener('input', function() {
+  state.spawnRate = parseInt(this.value);
+  document.getElementById('spawn-val').textContent = this.value;
+});
+
+// ═══════════════════════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════════════════════
+let lastSecond = 0;
+let lastCarMove = 0;
+
+function mainLoop(ts) {
+  const now = ts || 0;
+
+  // Move cars every ~50ms
+  if (now - lastCarMove > 50) {
+    moveCars();
+    lastCarMove = now;
+  }
+
+  // Tick every 1 second
+  if (now - lastSecond > (1000 / state.simSpeed)) {
+    state.tick++;
+    updateTraffic();
+    updateTimer();
+    updateRoadStats();
+    updatePriorityTable();
+    lastSecond = now;
+
+    // Charts every 2s
+    if (state.tick % 2 === 0) updateCharts();
+
+    // Algo animation every 3s
+    if (state.tick % 3 === 0) animateAlgoStep();
+  }
+
+  requestAnimationFrame(mainLoop);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  initCharts();
+  setSignal('East');
+  log('System initialized. Auto mode active.', 'info');
+  log('East / West received initial green signal.', 'signal');
+  // Pre-spawn some cars
+  ROADS.forEach(road => {
+    for (let i = 0; i < Math.floor(Math.random()*3+1); i++) spawnCar(road);
+  });
+  requestAnimationFrame(mainLoop);
+});
+</script>
+</body>
+</html>
